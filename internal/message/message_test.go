@@ -176,11 +176,12 @@ func TestRender_Truncation(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(result) > 100+len("\n...(truncated)") {
-		t.Errorf("result length %d exceeds max", len(result))
-	}
 	if !strings.HasSuffix(result, "...(truncated)") {
 		t.Error("truncated result should end with ...(truncated)")
+	}
+	withoutSuffix := strings.TrimSuffix(result, "\n...(truncated)")
+	if len([]rune(withoutSuffix)) != 100 {
+		t.Errorf("truncated to %d runes, want 100", len([]rune(withoutSuffix)))
 	}
 }
 
@@ -188,5 +189,28 @@ func TestRender_InvalidTemplate(t *testing.T) {
 	_, err := Render("{{.Invalid", AlertData{}, 1900)
 	if err == nil {
 		t.Fatal("expected error for invalid template")
+	}
+}
+
+func TestRender_Truncation_MultiByte(t *testing.T) {
+	emoji := "\U0001f534" // red circle: 4 bytes, 1 rune
+	data := AlertData{
+		Name:  strings.Repeat(emoji, 50), // 50 runes, 200 bytes
+		State: "Triggered",
+	}
+
+	result, err := Render("{{.Name}}", data, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.HasSuffix(result, "...(truncated)") {
+		t.Errorf("result should be truncated, got %q", result)
+	}
+
+	// Verify the truncated content is exactly 10 runes (not 10 bytes)
+	withoutSuffix := strings.TrimSuffix(result, "\n...(truncated)")
+	if len([]rune(withoutSuffix)) != 10 {
+		t.Errorf("truncated to %d runes, want 10", len([]rune(withoutSuffix)))
 	}
 }

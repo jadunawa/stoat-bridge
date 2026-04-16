@@ -55,8 +55,9 @@ func Render(tmpl string, data AlertData, maxLength int) (string, error) {
 	}
 
 	result := buf.String()
-	if maxLength > 0 && len(result) > maxLength {
-		result = result[:maxLength] + "\n...(truncated)"
+	runes := []rune(result)
+	if maxLength > 0 && len(runes) > maxLength {
+		result = string(runes[:maxLength]) + "\n...(truncated)"
 	}
 	return result, nil
 }
