@@ -1,7 +1,7 @@
 # Multi-stage build for local development and CI.
 # GoReleaser uses Dockerfile.goreleaser instead (pre-built binary).
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /build
 COPY go.mod go.sum ./

@@ -83,7 +83,7 @@ jobs:
         run: docker build -t stoat-bridge:ci .
 
       - name: Run Trivy
-        uses: aquasecurity/trivy-action@1994662b5555670344cd84d29ed3cad4bd26f31c # master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: stoat-bridge:ci
           format: table
