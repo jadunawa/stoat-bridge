@@ -70,23 +70,39 @@ func (q *Queue) Start(ctx context.Context) {
 func (q *Queue) Shutdown(timeout time.Duration) {
 	close(q.done)
 
-	// Drain remaining items with timeout
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+
+	// Wait for all in-flight work (worker + retries) while draining
+	// re-enqueued items from the channel.
+	done := make(chan struct{})
+	go func() {
+		q.wg.Wait()
+		close(done)
+	}()
 
 	for {
 		select {
 		case it := <-q.ch:
-			if it == nil {
-				return
+			if it != nil {
+				q.deliver(context.Background(), it)
 			}
-			q.deliver(context.Background(), it)
-		case <-timer.C:
+		case <-done:
+			// All goroutines finished — final non-blocking drain
+			for {
+				select {
+				case it := <-q.ch:
+					if it != nil {
+						q.deliver(context.Background(), it)
+					}
+				default:
+					return
+				}
+			}
+		case <-deadline.C:
 			q.logger.Warn("shutdown timeout, some messages may be lost",
 				"remaining", len(q.ch),
 			)
-			return
-		default:
 			return
 		}
 	}
@@ -154,7 +170,9 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 		"error", err,
 	)
 
+	q.wg.Add(1)
 	go func() {
+		defer q.wg.Done()
 		select {
 		case <-time.After(delay):
 			select {
@@ -165,7 +183,6 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 				)
 			}
 		case <-ctx.Done():
-		case <-q.done:
 		}
 	}()
 	q.metrics.SetQueueDepth(float64(len(q.ch)))

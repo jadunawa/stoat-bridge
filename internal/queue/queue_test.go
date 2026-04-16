@@ -202,6 +202,39 @@ func (m *mockReporter) ObserveDeliveryDuration(seconds float64) {
 
 func (m *mockReporter) SetQueueDepth(float64) {}
 
+func TestQueue_ShutdownWaitsForRetries(t *testing.T) {
+	mock := newMockSender()
+	mock.errFunc = func(_ message.Message) error {
+		mock.mu.Lock()
+		count := len(mock.calls)
+		mock.mu.Unlock()
+		if count <= 1 {
+			return errors.New("transient error")
+		}
+		return nil
+	}
+
+	q := New(mock, 10, 3, nil, nil)
+	q.baseDelay = 10 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	q.Start(ctx)
+
+	q.Enqueue(message.Message{Content: "retry-during-shutdown"})
+
+	// Wait for first delivery attempt (fails transiently)
+	<-mock.callCh
+
+	// Shutdown while retry is pending — should wait for it
+	q.Shutdown(2 * time.Second)
+
+	calls := mock.getCalls()
+	if len(calls) < 2 {
+		t.Errorf("expected at least 2 delivery attempts (retry during shutdown), got %d", len(calls))
+	}
+}
+
 func TestQueue_MetricsOnDelivery(t *testing.T) {
 	mock := newMockSender()
 	reporter := &mockReporter{}

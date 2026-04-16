@@ -125,14 +125,14 @@ func main() {
 
 	srv.SetReady(false)
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer shutdownCancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown error", "error", err)
 	}
 
-	cancel()
 	q.Shutdown(cfg.ShutdownTimeout)
+	cancel()
 
 	logger.Info("stoat-bridge stopped")
 }
