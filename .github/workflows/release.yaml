@@ -4,10 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.0)"
+        required: true
 
 permissions:
   contents: write
   packages: write
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   goreleaser:
@@ -17,6 +25,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -42,6 +51,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ env.RELEASE_TAG }}
 
   helm:
     name: Publish Helm Chart
@@ -49,6 +59,8 @@ jobs:
     needs: goreleaser
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a # v4
 
@@ -59,12 +71,12 @@ jobs:
 
       - name: Package chart
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
+          VERSION=${RELEASE_TAG#v}
           sed -i "s/^version:.*/version: ${VERSION}/" charts/stoat-bridge/Chart.yaml
           sed -i "s/^appVersion:.*/appVersion: ${VERSION}/" charts/stoat-bridge/Chart.yaml
           helm package charts/stoat-bridge/
 
       - name: Push chart
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
+          VERSION=${RELEASE_TAG#v}
           helm push stoat-bridge-${VERSION}.tgz oci://ghcr.io/jadunawa
