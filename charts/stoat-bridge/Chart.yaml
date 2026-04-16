@@ -2,8 +2,8 @@ apiVersion: v2
 name: stoat-bridge
 description: A webhook-to-chat bridge for delivering alert notifications to Stoat
 type: application
-version: 0.1.0
-appVersion: 0.1.0
+version: 0.1.1
+appVersion: 0.1.1
 maintainers:
   - name: jadunawa
 home: https://github.com/jadunawa/stoat-bridge
