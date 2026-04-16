@@ -83,12 +83,8 @@ func TestQueue_BufferFull_DropsNew(t *testing.T) {
 	q.Enqueue(message.Message{Content: "msg2"})
 	q.Enqueue(message.Message{Content: "msg3"})
 
-	// Fourth should be dropped
-	ok := q.Enqueue(message.Message{Content: "msg4"})
-	if ok {
-		// May or may not succeed depending on timing — not deterministic
-		// The important thing is it doesn't block
-	}
+	// Fourth should be dropped — result is non-deterministic due to timing
+	q.Enqueue(message.Message{Content: "msg4"})
 
 	close(blocker)
 }

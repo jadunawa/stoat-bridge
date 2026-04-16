@@ -247,7 +247,11 @@ func TestWrongMethod(t *testing.T) {
 func TestQueueFull_Returns202(t *testing.T) {
 	s := newTestServer()
 	s.SetReady(true)
-	s.queue.(*mockQueue).full = true
+	mq, ok := s.queue.(*mockQueue)
+	if !ok {
+		t.Fatal("queue is not *mockQueue")
+	}
+	mq.full = true
 
 	body := `{"alerts": [{"status": "firing", "labels": {"alertname": "Test", "severity": "warning"}, "annotations": {}, "generatorURL": ""}]}`
 	req := httptest.NewRequest(http.MethodPost, "/grafana", strings.NewReader(body))

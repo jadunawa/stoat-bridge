@@ -21,7 +21,7 @@ func TestStoatSender_Success(t *testing.T) {
 		gotPath = r.URL.Path
 		gotToken = r.Header.Get("x-bot-token")
 		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &gotBody)
+		_ = json.Unmarshal(body, &gotBody)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()

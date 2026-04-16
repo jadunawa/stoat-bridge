@@ -44,7 +44,7 @@ func newFakeStoat() *fakeStoat {
 		var payload struct {
 			Content string `json:"content"`
 		}
-		json.Unmarshal(body, &payload)
+		_ = json.Unmarshal(body, &payload)
 
 		fs.mu.Lock()
 		fs.messages = append(fs.messages, fakeStoatMessage{
