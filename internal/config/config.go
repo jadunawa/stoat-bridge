@@ -51,6 +51,7 @@ func Load() (*Config, error) {
 
 	maxRetries, err := getEnvInt("MAX_RETRIES", 3)
 	if err != nil { return nil, fmt.Errorf("invalid MAX_RETRIES: %w", err) }
+	if maxRetries < 0 { return nil, fmt.Errorf("MAX_RETRIES must be >= 0, got %d", maxRetries) }
 
 	maxBodySize, err := getEnvInt64("MAX_BODY_SIZE", 1048576)
 	if err != nil { return nil, fmt.Errorf("invalid MAX_BODY_SIZE: %w", err) }

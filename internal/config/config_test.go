@@ -105,3 +105,13 @@ func TestLoad_InvalidQueueSize(t *testing.T) {
 	_, err := Load()
 	if err == nil { t.Fatal("expected error for zero QUEUE_SIZE") }
 }
+
+func TestLoad_NegativeMaxRetries(t *testing.T) {
+	t.Setenv("STOAT_BOT_TOKEN", "test-token")
+	t.Setenv("STOAT_CHANNEL_ID", "default-ch")
+	t.Setenv("MAX_RETRIES", "-1")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for negative MAX_RETRIES")
+	}
+}
