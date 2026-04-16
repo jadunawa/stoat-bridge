@@ -28,25 +28,25 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: http
-              containerPort: {{ .Values.config.port }}
+              containerPort: {{ .Values.config.port | int }}
               protocol: TCP
           env:
             - name: PORT
-              value: {{ .Values.config.port | quote }}
+              value: {{ .Values.config.port | int | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
             - name: QUEUE_SIZE
-              value: {{ .Values.config.queueSize | quote }}
+              value: {{ .Values.config.queueSize | int | quote }}
             - name: MAX_RETRIES
-              value: {{ .Values.config.maxRetries | quote }}
+              value: {{ .Values.config.maxRetries | int | quote }}
             - name: SHUTDOWN_TIMEOUT
               value: {{ .Values.config.shutdownTimeout | quote }}
             - name: MAX_BODY_SIZE
-              value: {{ .Values.config.maxBodySize | quote }}
+              value: {{ .Values.config.maxBodySize | int | quote }}
             - name: MAX_MESSAGE_LENGTH
-              value: {{ .Values.config.maxMessageLength | quote }}
+              value: {{ .Values.config.maxMessageLength | int | quote }}
             - name: RATE_LIMIT
-              value: {{ .Values.config.rateLimit | quote }}
+              value: {{ .Values.config.rateLimit | int | quote }}
             - name: STOAT_API_URL
               value: {{ .Values.config.stoatApiUrl | quote }}
           {{- if .Values.existingSecret }}
