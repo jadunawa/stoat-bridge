@@ -17,6 +17,7 @@ spec:
         {{- include "stoat-bridge.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "stoat-bridge.serviceAccountName" . }}
+      automountServiceAccountToken: false
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
