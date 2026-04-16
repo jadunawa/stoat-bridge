@@ -58,7 +58,7 @@ func main() {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	stoatSender := sender.NewStoatSender(cfg.StoatAPIURL, cfg.StoatBotToken, httpClient)
 
-	q := queue.New(stoatSender, cfg.QueueSize, cfg.MaxRetries, logger)
+	q := queue.New(stoatSender, cfg.QueueSize, cfg.MaxRetries, logger, met)
 
 	reg := handler.NewRegistry()
 

@@ -76,7 +76,7 @@ func TestIntegration_GrafanaToStoat(t *testing.T) {
 
 	met := metrics.New()
 	stoatSender := sender.NewStoatSender(stoat.server.URL, "test-token", &http.Client{})
-	q := queue.New(stoatSender, 10, 3, nil)
+	q := queue.New(stoatSender, 10, 3, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -142,7 +142,7 @@ func TestIntegration_AlertmanagerToStoat(t *testing.T) {
 
 	met := metrics.New()
 	stoatSender := sender.NewStoatSender(stoat.server.URL, "test-token", &http.Client{})
-	q := queue.New(stoatSender, 10, 3, nil)
+	q := queue.New(stoatSender, 10, 3, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -208,7 +208,7 @@ func TestIntegration_GatusAutoDetect(t *testing.T) {
 
 	met := metrics.New()
 	stoatSender := sender.NewStoatSender(stoat.server.URL, "test-token", &http.Client{})
-	q := queue.New(stoatSender, 10, 3, nil)
+	q := queue.New(stoatSender, 10, 3, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -271,7 +271,7 @@ func TestIntegration_AuthBlocks(t *testing.T) {
 
 	met := metrics.New()
 	stoatSender := sender.NewStoatSender(stoat.server.URL, "test-token", &http.Client{})
-	q := queue.New(stoatSender, 10, 3, nil)
+	q := queue.New(stoatSender, 10, 3, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

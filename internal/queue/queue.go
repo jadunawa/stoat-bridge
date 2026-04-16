@@ -24,11 +24,15 @@ type Queue struct {
 	baseDelay  time.Duration
 	wg         sync.WaitGroup
 	done       chan struct{}
+	metrics    MetricsReporter
 }
 
-func New(s sender.Sender, size, maxRetries int, logger *slog.Logger) *Queue {
+func New(s sender.Sender, size, maxRetries int, logger *slog.Logger, metrics MetricsReporter) *Queue {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if metrics == nil {
+		metrics = noopReporter{}
 	}
 	return &Queue{
 		ch:         make(chan *item, size),
@@ -37,12 +41,14 @@ func New(s sender.Sender, size, maxRetries int, logger *slog.Logger) *Queue {
 		logger:     logger,
 		baseDelay:  1 * time.Second,
 		done:       make(chan struct{}),
+		metrics:    metrics,
 	}
 }
 
 func (q *Queue) Enqueue(msg message.Message) bool {
 	select {
 	case q.ch <- &item{msg: msg, attempts: 0}:
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		return true
 	default:
 		q.logger.Warn("queue full, message dropped",
@@ -104,9 +110,13 @@ func (q *Queue) worker(ctx context.Context) {
 }
 
 func (q *Queue) deliver(ctx context.Context, it *item) {
+	start := time.Now()
 	it.attempts++
 	err := q.sender.Send(ctx, it.msg)
 	if err == nil {
+		q.metrics.ObserveDeliveryDuration(time.Since(start).Seconds())
+		q.metrics.RecordDelivered(it.msg.ChannelID)
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		q.logger.Debug("message delivered",
 			"channel_id", it.msg.ChannelID,
 			"attempts", it.attempts,
@@ -116,6 +126,8 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 
 	var permErr *sender.PermanentError
 	if errors.As(err, &permErr) {
+		q.metrics.RecordDropped("permanent_error")
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		q.logger.Error("permanent delivery failure, message dropped",
 			"channel_id", it.msg.ChannelID,
 			"error", err,
@@ -124,6 +136,8 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 	}
 
 	if it.attempts >= q.maxRetries {
+		q.metrics.RecordDropped("max_retries")
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		q.logger.Warn("max retries exhausted, message dropped",
 			"channel_id", it.msg.ChannelID,
 			"attempts", it.attempts,
@@ -154,4 +168,5 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 		case <-q.done:
 		}
 	}()
+	q.metrics.SetQueueDepth(float64(len(q.ch)))
 }
