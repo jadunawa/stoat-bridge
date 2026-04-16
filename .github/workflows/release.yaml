@@ -79,4 +79,4 @@ jobs:
       - name: Push chart
         run: |
           VERSION=${RELEASE_TAG#v}
-          helm push stoat-bridge-${VERSION}.tgz oci://ghcr.io/jadunawa
+          helm push stoat-bridge-${VERSION}.tgz oci://ghcr.io/jadunawa/charts
