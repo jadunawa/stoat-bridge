@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"io"
 	"log/slog"
@@ -208,7 +209,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		auth := r.Header.Get("Authorization")
 		expected := "Bearer " + s.cfg.WebhookSecret
 
-		if auth != expected {
+		if subtle.ConstantTimeCompare([]byte(auth), []byte(expected)) != 1 {
 			s.logger.Warn("unauthorized request",
 				"request_id", middleware.GetReqID(r.Context()),
 				"remote_addr", r.RemoteAddr,
