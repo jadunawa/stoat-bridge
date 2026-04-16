@@ -130,13 +130,9 @@ func TestGatusHandler_UnknownAlertType(t *testing.T) {
 	}`
 
 	h := NewGatusHandler(gatusOpts())
-	msgs, err := h.Parse(newRequest(body))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(msgs) != 0 {
-		t.Errorf("got %d messages, want 0 for unknown type", len(msgs))
+	_, err := h.Parse(newRequest(body))
+	if err == nil {
+		t.Fatal("expected error for unknown alert type")
 	}
 }
 
