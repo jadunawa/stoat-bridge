@@ -1,12 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"crypto/subtle"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -158,7 +158,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Replace the body so the handler can read it
-	r.Body = io.NopCloser(strings.NewReader(string(body)))
+	r.Body = io.NopCloser(bytes.NewReader(body))
 	s.processWebhook(w, r, h, name)
 }
 
@@ -185,6 +185,7 @@ func (s *Server) processWebhook(w http.ResponseWriter, r *http.Request, h handle
 	}
 
 	s.metrics.WebhooksReceived.WithLabelValues(source, "202").Inc()
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	_, _ = fmt.Fprintf(w, `{"status":"accepted","messages":%d}`, len(msgs))
 }
