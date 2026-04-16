@@ -1,0 +1,70 @@
+version: 2
+
+builds:
+  - id: stoat-bridge
+    main: ./cmd/stoat-bridge/
+    binary: stoat-bridge
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+
+dockers:
+  - id: amd64
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - id: arm64
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+  - id: armv7
+    goos: linux
+    goarch: arm
+    goarm: "7"
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-armv7"
+    build_flag_templates:
+      - "--platform=linux/arm/v7"
+
+docker_manifests:
+  - name_template: "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-amd64"
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-arm64"
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-armv7"
+
+  - name_template: "ghcr.io/jadunawa/stoat-bridge:latest"
+    image_templates:
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-amd64"
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-arm64"
+      - "ghcr.io/jadunawa/stoat-bridge:{{ .Version }}-armv7"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^ci:"

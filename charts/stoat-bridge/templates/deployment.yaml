@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stoat-bridge.fullname" . }}
+  labels:
+    {{- include "stoat-bridge.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "stoat-bridge.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stoat-bridge.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "stoat-bridge.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: stoat-bridge
+          image: {{ include "stoat-bridge.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.config.port | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: QUEUE_SIZE
+              value: {{ .Values.config.queueSize | quote }}
+            - name: MAX_RETRIES
+              value: {{ .Values.config.maxRetries | quote }}
+            - name: SHUTDOWN_TIMEOUT
+              value: {{ .Values.config.shutdownTimeout | quote }}
+            - name: MAX_BODY_SIZE
+              value: {{ .Values.config.maxBodySize | quote }}
+            - name: MAX_MESSAGE_LENGTH
+              value: {{ .Values.config.maxMessageLength | quote }}
+            - name: RATE_LIMIT
+              value: {{ .Values.config.rateLimit | quote }}
+            - name: STOAT_API_URL
+              value: {{ .Values.config.stoatApiUrl | quote }}
+          {{- if .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
