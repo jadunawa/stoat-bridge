@@ -105,18 +105,18 @@ func (s *Server) buildRouter() {
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"status":"ok"}`)
+	_, _ = fmt.Fprint(w, `{"status":"ok"}`)
 }
 
 func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if !s.ready.Load() {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprint(w, `{"status":"not ready"}`)
+		_, _ = fmt.Fprint(w, `{"status":"not ready"}`)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"status":"ok"}`)
+	_, _ = fmt.Fprint(w, `{"status":"ok"}`)
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +185,7 @@ func (s *Server) processWebhook(w http.ResponseWriter, r *http.Request, h handle
 
 	s.metrics.WebhooksReceived.WithLabelValues(source, "202").Inc()
 	w.WriteHeader(http.StatusAccepted)
-	fmt.Fprintf(w, `{"status":"accepted","messages":%d}`, len(msgs))
+	_, _ = fmt.Fprintf(w, `{"status":"accepted","messages":%d}`, len(msgs))
 }
 
 // Middleware
