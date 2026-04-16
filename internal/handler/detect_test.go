@@ -92,3 +92,13 @@ func TestDetect_EmptyObject(t *testing.T) {
 		t.Fatal("expected error for empty object")
 	}
 }
+
+func TestDetect_TypeEndpointButNotGatus(t *testing.T) {
+	// Has "type" and "endpoint" fields but type is not a Gatus value —
+	// should NOT match Gatus, should fall through to unknown.
+	body := `{"type": "something-else", "endpoint": {"name": "Test"}}`
+	_, err := Detect([]byte(body))
+	if err == nil {
+		t.Fatal("expected error — type+endpoint with non-Gatus type value should not match")
+	}
+}
