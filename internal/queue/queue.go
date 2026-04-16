@@ -24,11 +24,15 @@ type Queue struct {
 	baseDelay  time.Duration
 	wg         sync.WaitGroup
 	done       chan struct{}
+	metrics    MetricsReporter
 }
 
-func New(s sender.Sender, size, maxRetries int, logger *slog.Logger) *Queue {
+func New(s sender.Sender, size, maxRetries int, logger *slog.Logger, metrics MetricsReporter) *Queue {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if metrics == nil {
+		metrics = noopReporter{}
 	}
 	return &Queue{
 		ch:         make(chan *item, size),
@@ -37,12 +41,14 @@ func New(s sender.Sender, size, maxRetries int, logger *slog.Logger) *Queue {
 		logger:     logger,
 		baseDelay:  1 * time.Second,
 		done:       make(chan struct{}),
+		metrics:    metrics,
 	}
 }
 
 func (q *Queue) Enqueue(msg message.Message) bool {
 	select {
 	case q.ch <- &item{msg: msg, attempts: 0}:
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		return true
 	default:
 		q.logger.Warn("queue full, message dropped",
@@ -64,23 +70,39 @@ func (q *Queue) Start(ctx context.Context) {
 func (q *Queue) Shutdown(timeout time.Duration) {
 	close(q.done)
 
-	// Drain remaining items with timeout
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+
+	// Wait for all in-flight work (worker + retries) while draining
+	// re-enqueued items from the channel.
+	done := make(chan struct{})
+	go func() {
+		q.wg.Wait()
+		close(done)
+	}()
 
 	for {
 		select {
 		case it := <-q.ch:
-			if it == nil {
-				return
+			if it != nil {
+				q.deliver(context.Background(), it)
 			}
-			q.deliver(context.Background(), it)
-		case <-timer.C:
+		case <-done:
+			// All goroutines finished — final non-blocking drain
+			for {
+				select {
+				case it := <-q.ch:
+					if it != nil {
+						q.deliver(context.Background(), it)
+					}
+				default:
+					return
+				}
+			}
+		case <-deadline.C:
 			q.logger.Warn("shutdown timeout, some messages may be lost",
 				"remaining", len(q.ch),
 			)
-			return
-		default:
 			return
 		}
 	}
@@ -104,9 +126,13 @@ func (q *Queue) worker(ctx context.Context) {
 }
 
 func (q *Queue) deliver(ctx context.Context, it *item) {
+	start := time.Now()
 	it.attempts++
 	err := q.sender.Send(ctx, it.msg)
 	if err == nil {
+		q.metrics.ObserveDeliveryDuration(time.Since(start).Seconds())
+		q.metrics.RecordDelivered(it.msg.ChannelID)
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		q.logger.Debug("message delivered",
 			"channel_id", it.msg.ChannelID,
 			"attempts", it.attempts,
@@ -116,6 +142,8 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 
 	var permErr *sender.PermanentError
 	if errors.As(err, &permErr) {
+		q.metrics.RecordDropped("permanent_error")
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		q.logger.Error("permanent delivery failure, message dropped",
 			"channel_id", it.msg.ChannelID,
 			"error", err,
@@ -124,6 +152,8 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 	}
 
 	if it.attempts >= q.maxRetries {
+		q.metrics.RecordDropped("max_retries")
+		q.metrics.SetQueueDepth(float64(len(q.ch)))
 		q.logger.Warn("max retries exhausted, message dropped",
 			"channel_id", it.msg.ChannelID,
 			"attempts", it.attempts,
@@ -140,7 +170,9 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 		"error", err,
 	)
 
+	q.wg.Add(1)
 	go func() {
+		defer q.wg.Done()
 		select {
 		case <-time.After(delay):
 			select {
@@ -151,7 +183,7 @@ func (q *Queue) deliver(ctx context.Context, it *item) {
 				)
 			}
 		case <-ctx.Done():
-		case <-q.done:
 		}
 	}()
+	q.metrics.SetQueueDepth(float64(len(q.ch)))
 }

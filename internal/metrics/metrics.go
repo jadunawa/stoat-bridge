@@ -66,3 +66,19 @@ func New() *Metrics {
 
 	return m
 }
+
+func (m *Metrics) RecordDelivered(channelID string) {
+	m.MessagesDelivered.WithLabelValues(channelID).Inc()
+}
+
+func (m *Metrics) RecordDropped(reason string) {
+	m.MessagesDropped.WithLabelValues(reason).Inc()
+}
+
+func (m *Metrics) ObserveDeliveryDuration(seconds float64) {
+	m.DeliveryDuration.Observe(seconds)
+}
+
+func (m *Metrics) SetQueueDepth(depth float64) {
+	m.QueueDepth.Set(depth)
+}

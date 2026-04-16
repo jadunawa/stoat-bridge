@@ -18,6 +18,11 @@ import (
 	"github.com/jadunawa/stoat-bridge/internal/server"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+)
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -40,6 +45,8 @@ func main() {
 	slog.SetDefault(logger)
 
 	logger.Info("starting stoat-bridge",
+		"version", version,
+		"commit", commit,
 		"port", cfg.Port,
 		"log_level", cfg.LogLevel,
 		"queue_size", cfg.QueueSize,
@@ -51,7 +58,7 @@ func main() {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	stoatSender := sender.NewStoatSender(cfg.StoatAPIURL, cfg.StoatBotToken, httpClient)
 
-	q := queue.New(stoatSender, cfg.QueueSize, cfg.MaxRetries, logger)
+	q := queue.New(stoatSender, cfg.QueueSize, cfg.MaxRetries, logger, met)
 
 	reg := handler.NewRegistry()
 
@@ -118,14 +125,14 @@ func main() {
 
 	srv.SetReady(false)
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer shutdownCancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown error", "error", err)
 	}
 
-	cancel()
 	q.Shutdown(cfg.ShutdownTimeout)
+	cancel()
 
 	logger.Info("stoat-bridge stopped")
 }

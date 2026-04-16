@@ -52,7 +52,7 @@ func (h *GatusHandler) Parse(r *http.Request) ([]message.Message, error) {
 		state = "Resolved"
 		status = "resolved"
 	default:
-		return nil, nil // Unknown alert type, ignore
+		return nil, fmt.Errorf("unknown gatus alert type: %q", payload.Type)
 	}
 
 	severity := "critical"

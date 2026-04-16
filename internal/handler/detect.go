@@ -13,10 +13,15 @@ func Detect(body []byte) (string, error) {
 		return "", fmt.Errorf("invalid JSON: %w", err)
 	}
 
-	// Gatus: has "type" and "endpoint" fields
-	if _, hasType := raw["type"]; hasType {
-		if _, hasEndpoint := raw["endpoint"]; hasEndpoint {
-			return "gatus", nil
+	// Gatus: has "type" with known Gatus value and "endpoint" field
+	if typeRaw, hasType := raw["type"]; hasType {
+		var typeStr string
+		if err := json.Unmarshal(typeRaw, &typeStr); err == nil {
+			if typeStr == "alert-triggered" || typeStr == "alert-resolved" {
+				if _, hasEndpoint := raw["endpoint"]; hasEndpoint {
+					return "gatus", nil
+				}
+			}
 		}
 	}
 

@@ -43,7 +43,7 @@ func (m *mockSender) getCalls() []message.Message {
 
 func TestQueue_EnqueueAndDeliver(t *testing.T) {
 	mock := newMockSender()
-	q := New(mock, 10, 3, nil)
+	q := New(mock, 10, 3, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -73,7 +73,7 @@ func TestQueue_BufferFull_DropsNew(t *testing.T) {
 		return nil
 	}
 
-	q := New(mock, 2, 3, nil)
+	q := New(mock, 2, 3, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q.Start(ctx)
@@ -102,7 +102,7 @@ func TestQueue_RetryOnTransientError(t *testing.T) {
 		return nil
 	}
 
-	q := New(mock, 10, 3, nil)
+	q := New(mock, 10, 3, nil, nil)
 	q.baseDelay = 10 * time.Millisecond // Speed up for tests
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -133,7 +133,7 @@ func TestQueue_DropOnPermanentError(t *testing.T) {
 		return &sender.PermanentError{Err: errors.New("bad request")}
 	}
 
-	q := New(mock, 10, 3, nil)
+	q := New(mock, 10, 3, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q.Start(ctx)
@@ -157,7 +157,7 @@ func TestQueue_DropOnPermanentError(t *testing.T) {
 
 func TestQueue_GracefulDrain(t *testing.T) {
 	mock := newMockSender()
-	q := New(mock, 10, 3, nil)
+	q := New(mock, 10, 3, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	q.Start(ctx)
@@ -172,5 +172,125 @@ func TestQueue_GracefulDrain(t *testing.T) {
 	calls := mock.getCalls()
 	if len(calls) < 2 {
 		t.Errorf("expected at least 2 delivered during drain, got %d", len(calls))
+	}
+}
+
+type mockReporter struct {
+	mu        sync.Mutex
+	delivered []string
+	dropped   []string
+	durations []float64
+}
+
+func (m *mockReporter) RecordDelivered(channelID string) {
+	m.mu.Lock()
+	m.delivered = append(m.delivered, channelID)
+	m.mu.Unlock()
+}
+
+func (m *mockReporter) RecordDropped(reason string) {
+	m.mu.Lock()
+	m.dropped = append(m.dropped, reason)
+	m.mu.Unlock()
+}
+
+func (m *mockReporter) ObserveDeliveryDuration(seconds float64) {
+	m.mu.Lock()
+	m.durations = append(m.durations, seconds)
+	m.mu.Unlock()
+}
+
+func (m *mockReporter) SetQueueDepth(float64) {}
+
+func TestQueue_ShutdownWaitsForRetries(t *testing.T) {
+	mock := newMockSender()
+	mock.errFunc = func(_ message.Message) error {
+		mock.mu.Lock()
+		count := len(mock.calls)
+		mock.mu.Unlock()
+		if count <= 1 {
+			return errors.New("transient error")
+		}
+		return nil
+	}
+
+	q := New(mock, 10, 3, nil, nil)
+	q.baseDelay = 10 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	q.Start(ctx)
+
+	q.Enqueue(message.Message{Content: "retry-during-shutdown"})
+
+	// Wait for first delivery attempt (fails transiently)
+	<-mock.callCh
+
+	// Shutdown while retry is pending — should wait for it
+	q.Shutdown(2 * time.Second)
+
+	calls := mock.getCalls()
+	if len(calls) < 2 {
+		t.Errorf("expected at least 2 delivery attempts (retry during shutdown), got %d", len(calls))
+	}
+}
+
+func TestQueue_MetricsOnDelivery(t *testing.T) {
+	mock := newMockSender()
+	reporter := &mockReporter{}
+	q := New(mock, 10, 3, nil, reporter)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	q.Start(ctx)
+
+	q.Enqueue(message.Message{ChannelID: "ch-1", Content: "hello"})
+
+	select {
+	case <-mock.callCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for delivery")
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	reporter.mu.Lock()
+	defer reporter.mu.Unlock()
+
+	if len(reporter.delivered) != 1 || reporter.delivered[0] != "ch-1" {
+		t.Errorf("delivered = %v, want [ch-1]", reporter.delivered)
+	}
+	if len(reporter.durations) != 1 {
+		t.Errorf("durations count = %d, want 1", len(reporter.durations))
+	}
+}
+
+func TestQueue_MetricsOnDrop(t *testing.T) {
+	mock := newMockSender()
+	mock.errFunc = func(_ message.Message) error {
+		return &sender.PermanentError{Err: errors.New("bad")}
+	}
+	reporter := &mockReporter{}
+	q := New(mock, 10, 3, nil, reporter)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	q.Start(ctx)
+
+	q.Enqueue(message.Message{ChannelID: "ch-1", Content: "fail"})
+
+	select {
+	case <-mock.callCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for delivery attempt")
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	reporter.mu.Lock()
+	defer reporter.mu.Unlock()
+
+	if len(reporter.dropped) != 1 || reporter.dropped[0] != "permanent_error" {
+		t.Errorf("dropped = %v, want [permanent_error]", reporter.dropped)
 	}
 }
