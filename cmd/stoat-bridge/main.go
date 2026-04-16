@@ -18,6 +18,11 @@ import (
 	"github.com/jadunawa/stoat-bridge/internal/server"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+)
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -40,6 +45,8 @@ func main() {
 	slog.SetDefault(logger)
 
 	logger.Info("starting stoat-bridge",
+		"version", version,
+		"commit", commit,
 		"port", cfg.Port,
 		"log_level", cfg.LogLevel,
 		"queue_size", cfg.QueueSize,
